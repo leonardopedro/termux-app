@@ -1,0 +1,33 @@
+apply plugin: 'com.android.library'
+
+def emthinAndroidDir = findProperty('emthinAndroidDir') ?: "${rootDir}/../emthin/emthin-android"
+def emthinCompileSdk = (findProperty('emthinCompileSdk') ?: project.properties.compileSdkVersion).toInteger()
+
+android {
+    namespace "com.emthin.pad"
+    compileSdk = emthinCompileSdk
+
+    defaultConfig {
+        minSdkVersion project.properties.minSdkVersion.toInteger()
+        targetSdkVersion project.properties.targetSdkVersion.toInteger()
+    }
+
+    sourceSets {
+        main {
+            java {
+                srcDirs = [file("${emthinAndroidDir}/android/src")]
+                exclude '**/MainActivity.java', '**/ProofClientActivity.java', '**/QrScanActivity.java'
+            }
+            jniLibs.srcDirs = [file("${projectDir}/src/main/jniLibs")]
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+}
+
+dependencies {
+    implementation files("${emthinAndroidDir}/android/libs/core-3.5.3.jar")
+}
