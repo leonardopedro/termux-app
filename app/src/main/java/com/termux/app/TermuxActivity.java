@@ -92,6 +92,11 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
     TerminalView mTerminalView;
 
     /**
+     * Document-authoritative emthin workspace hosting Termux figures and spawned Wayland windows.
+     */
+    com.termux.app.emthin.EmthinWorkspaceView mEmthinWorkspaceView;
+
+    /**
      *  The {@link TerminalViewClient} interface implementation to allow for communication between
      *  {@link TerminalView} and {@link TermuxActivity}.
      */
@@ -245,6 +250,33 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
 
         setTerminalToolbarView(savedInstanceState);
 
+        mEmthinWorkspaceView = findViewById(R.id.emthin_workspace_view);
+        if (mEmthinWorkspaceView != null) {
+            mEmthinWorkspaceView.setActions(new com.termux.app.emthin.EmthinWorkspaceView.Actions() {
+                @Override
+                public void onRequestNewTerminal() {
+                    if (mTermuxTerminalSessionActivityClient != null) {
+                        mTermuxTerminalSessionActivityClient.addNewSession(false, null);
+                    }
+                }
+
+                @Override
+                public void onFocusTerminalSession(TerminalSession session) {
+                    if (mTermuxTerminalSessionActivityClient != null && session != null) {
+                        mTermuxTerminalSessionActivityClient.setCurrentSession(session);
+                    }
+                    if (mTerminalView != null) {
+                        mTerminalView.requestFocus();
+                        android.view.inputmethod.InputMethodManager imm =
+                            (android.view.inputmethod.InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+                        if (imm != null) {
+                            imm.showSoftInput(mTerminalView, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT);
+                        }
+                    }
+                }
+            });
+        }
+
         setSettingsButtonView();
 
         setNewSessionButtonView();
@@ -315,6 +347,11 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         if (mTermuxTerminalViewClient != null)
             mTermuxTerminalViewClient.onResume();
 
+        if (mEmthinWorkspaceView != null) {
+            mEmthinWorkspaceView.attachAndResume();
+            syncEmthinSessions();
+        }
+
         // Check if a crash happened on last run of the app or if a plugin crashed and show a
         // notification with the crash details if it did
         TermuxCrashUtils.notifyAppCrashFromCrashLogFile(this, LOG_TAG);
@@ -338,6 +375,9 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         if (mTermuxTerminalViewClient != null)
             mTermuxTerminalViewClient.onStop();
 
+        if (mEmthinWorkspaceView != null)
+            mEmthinWorkspaceView.pausePump();
+
         removeTermuxActivityRootViewGlobalLayoutListener();
 
         unregisterTermuxActivityBroadcastReceiver();
@@ -356,6 +396,10 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
             // Do not leave service and session clients with references to activity.
             mTermuxService.unsetTermuxTerminalSessionClient();
             mTermuxService = null;
+        }
+
+        if (mEmthinWorkspaceView != null) {
+            mEmthinWorkspaceView.releaseResources();
         }
 
         try {
@@ -392,6 +436,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         setTermuxSessionsListView();
 
         final Intent intent = getIntent();
+        final boolean runEmthinSmoke = intent != null && intent.getBooleanExtra("com.termux.emthin.smoke", false);
         setIntent(null);
 
         if (mTermuxService.isTermuxSessionsEmpty()) {
@@ -427,6 +472,11 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
 
         // Update the {@link TerminalSession} and {@link TerminalEmulator} clients.
         mTermuxService.setTermuxTerminalSessionClient(mTermuxTerminalSessionActivityClient);
+
+        syncEmthinSessions();
+        if (runEmthinSmoke && mEmthinWorkspaceView != null) {
+            mEmthinWorkspaceView.runSmoke(this);
+        }
     }
 
     @Override
@@ -875,6 +925,21 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
 
     public TermuxService getTermuxService() {
         return mTermuxService;
+    }
+
+    public com.termux.app.emthin.EmthinWorkspaceView getEmthinWorkspaceView() {
+        return mEmthinWorkspaceView;
+    }
+
+    public void syncEmthinSessions() {
+        if (mEmthinWorkspaceView == null || mTermuxService == null) return;
+        java.util.List<TerminalSession> list = new java.util.ArrayList<>();
+        for (com.termux.shared.termux.shell.command.runner.terminal.TermuxSession ts : mTermuxService.getTermuxSessions()) {
+            if (ts != null && ts.getTerminalSession() != null) {
+                list.add(ts.getTerminalSession());
+            }
+        }
+        mEmthinWorkspaceView.syncSessions(list, getCurrentSession());
     }
 
     public TerminalView getTerminalView() {

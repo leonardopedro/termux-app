@@ -119,6 +119,10 @@ public class TermuxTerminalSessionActivityClient extends TermuxTerminalSessionCl
         if (!mActivity.isVisible()) return;
 
         if (mActivity.getCurrentSession() == changedSession) mActivity.getTerminalView().onScreenUpdated();
+
+        if (mActivity.getEmthinWorkspaceView() != null) {
+            mActivity.getEmthinWorkspaceView().notifySessionScreenUpdated(changedSession);
+        }
     }
 
     @Override
@@ -302,6 +306,7 @@ public class TermuxTerminalSessionActivityClient extends TermuxTerminalSessionCl
         // be stale, like current session not selected or scrolled to.
         checkAndScrollToSession(session);
         updateBackgroundColor();
+        mActivity.syncEmthinSessions();
     }
 
     void notifyOfSessionChange() {

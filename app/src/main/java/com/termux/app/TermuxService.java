@@ -117,6 +117,8 @@ public final class TermuxService extends Service implements AppShell.AppShellCli
 
         mShellManager = TermuxShellManager.getShellManager();
 
+        com.termux.app.emthin.EmthinWaylandBridge.ensureStarted(this);
+
         runStartForeground();
 
         SystemEventReceiver.registerPackageUpdateEvents(this);
@@ -178,6 +180,8 @@ public final class TermuxService extends Service implements AppShell.AppShellCli
         TermuxShellManager.onAppExit(this);
 
         SystemEventReceiver.unregisterPackageUpdateEvents(this);
+
+        com.termux.app.emthin.EmthinWaylandBridge.stop();
 
         runStopForeground();
     }

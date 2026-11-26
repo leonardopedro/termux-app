@@ -78,6 +78,39 @@ public class TermuxShellEnvironment extends AndroidShellEnvironment {
         environment.put(ENV_HOME, TermuxConstants.TERMUX_HOME_DIR_PATH);
         environment.put(ENV_PREFIX, TermuxConstants.TERMUX_PREFIX_DIR_PATH);
 
+        // Always expose emthin's embedded Wayland compositor runtime directory and display.
+        if (currentPackageContext != null) {
+            java.io.File runtimeDir = new java.io.File(currentPackageContext.getFilesDir(), "xdg-runtime");
+            if (!runtimeDir.exists()) {
+                runtimeDir.mkdirs();
+            }
+            try {
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
+                    android.system.Os.chmod(runtimeDir.getAbsolutePath(), 0700);
+                }
+            } catch (Throwable ignored) {
+                runtimeDir.setReadable(true, true);
+                runtimeDir.setWritable(true, true);
+                runtimeDir.setExecutable(true, true);
+            }
+            String runtimePath = runtimeDir.getAbsolutePath();
+            String socketPath = new java.io.File(runtimeDir, "wayland-0").getAbsolutePath();
+            environment.put("XDG_RUNTIME_DIR", runtimePath);
+            environment.put("WAYLAND_DISPLAY", "wayland-0");
+            environment.put("XDG_SESSION_TYPE", "wayland");
+            environment.put("XDG_CURRENT_DESKTOP", "emthin");
+            environment.put("EMTHIN_WAYLAND_SOCKET", socketPath);
+            environment.put("GDK_BACKEND", "wayland");
+            environment.put("QT_QPA_PLATFORM", "wayland");
+            environment.put("SDL_VIDEODRIVER", "wayland");
+            environment.put("MOZ_ENABLE_WAYLAND", "1");
+            String libDir = currentPackageContext.getApplicationInfo() != null
+                ? currentPackageContext.getApplicationInfo().nativeLibraryDir : null;
+            if (libDir != null && !libDir.isEmpty()) {
+                environment.put("EMTHIN_WL_DEMO", new java.io.File(libDir, "libemthin_wl_demo.so").getAbsolutePath());
+            }
+        }
+
         // If failsafe is not enabled, then we keep default PATH and TMPDIR so that system binaries can be used
         if (!isFailSafe) {
             environment.put(ENV_TMPDIR, TermuxConstants.TERMUX_TMP_PREFIX_DIR_PATH);

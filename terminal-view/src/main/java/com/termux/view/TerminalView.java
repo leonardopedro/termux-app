@@ -987,6 +987,17 @@ public final class TerminalView extends View {
         int viewHeight = getHeight();
         if (viewWidth == 0 || viewHeight == 0 || mTermSession == null) return;
 
+        // When TerminalView is embedded as a 1dp keyboard-input proxy inside emthin,
+        // keep the PTY sized by EmthinTermuxFigureView rather than collapsing to 4x4.
+        if (viewWidth <= 8 || viewHeight <= 8) {
+            if (mTermSession.getEmulator() == null) {
+                mTermSession.updateSize(80, 24, (int) mRenderer.getFontWidth(), mRenderer.mFontLineSpacing);
+            }
+            mEmulator = mTermSession.getEmulator();
+            mClient.onEmulatorSet();
+            return;
+        }
+
         // Set to 80 and 24 if you want to enable vttest.
         int newColumns = Math.max(4, (int) (viewWidth / mRenderer.mFontWidth));
         int newRows = Math.max(4, (viewHeight - mRenderer.mFontLineSpacingAndAscent) / mRenderer.mFontLineSpacing);

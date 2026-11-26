@@ -22,6 +22,8 @@ Quick how-to about Termux package management is available at [Package Management
 ***
 
 ## Contents
+- [emthin Document + Wayland Integration](#emthin-document--wayland-integration)
+- [Installing on Android for a Teenager (F-Droid + Parental Lockdown)](#installing-on-android-for-a-teenager-f-droid--parental-lockdown)
 - [Termux App and Plugins](#termux-app-and-plugins)
 - [Installation](#installation)
 - [Uninstallation](#uninstallation)
@@ -29,10 +31,69 @@ Quick how-to about Termux package management is available at [Package Management
 - [Debugging](#debugging)
 - [For Maintainers and Contributors](#for-maintainers-and-contributors)
 - [Forking](#forking)
+##
 - [Sponsors and Funders](#sponsors-and-funders)
 ##
 
+## emthin Document + Wayland Integration
 
+This fork merges [emthin](https://github.com/voxell-tech/velyst) (`:emthin-core` from `../emthin/emthin-android`) directly into `com.termux` so both Termux terminal sessions and Wayland applications launched from the Termux shell render as document-authoritative `\app` figures on a live Typst page:
+
+- **Terminal figures (`EmthinTermuxFigureView`)**: each `TerminalSession` is slotted into a `"termux:<handle>"` `\app` figure and rendered via `TerminalRenderer` -> RGBA -> `GpuRuntime.renderRgba` (EGL/GLES3 on hardware GPUs, automatic `ANativeWindow_lock` CPU fallback otherwise).
+- **Embedded Wayland compositor (`EmthinWaylandBridge`)**: `TermuxService` starts emthin's `AF_UNIX` Wayland compositor at `<filesDir>/xdg-runtime/wayland-0`, and `TermuxShellEnvironment` exports `XDG_RUNTIME_DIR`, `WAYLAND_DISPLAY=wayland-0`, `XDG_SESSION_TYPE=wayland`, `XDG_CURRENT_DESKTOP=emthin`, `EMTHIN_WAYLAND_SOCKET`, `GDK_BACKEND=wayland`, `QT_QPA_PLATFORM=wayland`, `SDL_VIDEODRIVER=wayland`, `MOZ_ENABLE_WAYLAND=1`, and `EMTHIN_WL_DEMO`.
+- **Auto-slotted Wayland windows (`EmthinWorkspaceView`)**: unbound `xdg_toplevel` clients opened from a shell are announced by `DocBridge.waylandTakePendingToplevels`, auto-slotted via `DocBridge.appendAppFigure`, configured by document geometry, and rendered through `WaylandSurfaceView` (`GpuRuntime` GPU + CPU fallback). A top bar lets you inspect/edit the Typst source (`Doc`), spawn another terminal figure (`+Term`), or toggle forced CPU fallback (`GPU/CPU`).
+- **Comparison with `anland-termux`**: unlike a separate companion APK, embedding `:emthin-core` directly inside `com.termux` avoids cross-app `sharedUserId` / Binder FD forwarding, and `wl_shm` + `GpuRuntime` EGL/GLES3 with automatic CPU fallback runs across both GPU-accelerated and software-rendered environments.
+
+### Local Build & Wayland Demo
+
+```bash
+./build-emthin-termux.sh
+```
+
+After installing `app/build/outputs/apk/debug/termux-app_apt-android-7-debug_arm64-v8a.apk`, run the bundled native Wayland client from any Termux shell:
+
+```sh
+"$EMTHIN_WL_DEMO" --app-id demo --title "Demo Window" --seconds 15 &
+```
+
+Automated Waydroid smoke launch:
+
+```bash
+adb shell am start -S -n com.termux/.app.TermuxActivity --ez com.termux.emthin.smoke true
+adb logcat -d | grep emthinTermux
+```
+
+### Installing on Android for a Teenager (F-Droid + Parental Lockdown)
+
+This guide assumes the app is published on F-Droid and starts from a standard Android phone or tablet (parent present to set private PINs):
+
+1. **Switch to Developer mode (Developer options):**
+   - Open **Settings → About phone** (Samsung: **About phone → Software information**), tap **Build number** **7 times**, and enter the lock screen PIN/pattern/password.
+   - Open **Settings → System → Developer options**: optionally enable **Disable child process restrictions** (if shown on Android 14+) for background shell stability, and keep **USB debugging** **OFF**.
+2. **Install F-Droid:**
+   - Visit `https://f-droid.org` in the browser and tap **Download F-Droid** (`F-Droid.apk`).
+   - Open `F-Droid.apk`, tap **Settings** when Android prompts about unknown apps, temporarily toggle **Allow from this source** **ON** for the browser, go back, and tap **Install**.
+   - Launch **F-Droid**, wait for repository sync, and allow **Install unknown apps** for **F-Droid** when prompted.
+3. **Install this app from F-Droid:**
+   - Search for the app in **F-Droid**, open its listing, tap **Install**, and open it once so initial Termux bootstrap extraction completes.
+4. **Enable automatic updates in Google Play Store and F-Droid:**
+   - **Google Play Store:** **Profile icon → Settings → Network preferences → Auto-update apps → Over Wi-Fi only** (or **Over any network**).
+   - **F-Droid:** **Settings → Updates** → set **Automatic update interval** (e.g., **Daily**), turn **ON** **Automatically fetch updates** (Wi-Fi) and **Automatically install updates** (Android 12+), then set **Settings → Apps → F-Droid → Battery → Unrestricted**.
+5. **Block installing any extra `.apk` files outside Google Play Store and F-Droid:**
+   - Open **Settings → Apps → Special app access → Install unknown apps**.
+   - Set **Allow from this source** to **OFF** for every app (browsers, Files/file managers, messengers, email) **except F-Droid**.
+   - Delete `F-Droid.apk` from **Downloads**.
+   - Ensure **USB debugging** stays **OFF** (or switch **Developer options** **OFF** completely if you did not need the Android 14+ child-process toggle).
+6. **Password-protect Google Play Store, F-Droid, and Settings:**
+   - **Google Play Store:** **Profile icon → Settings → Family → Parental controls → ON** with a parent-only PIN, and **Settings → Authentication → Require authentication for purchases → For all purchases**. (With **Google Family Link**, also set **Require approval for → All content**.)
+   - **F-Droid + Settings (App Lock):** F-Droid has no built-in launch password, and locking **Settings** is required so *Install unknown apps* cannot be re-enabled:
+     - Use your phone's built-in **App Lock** (Xiaomi/OnePlus/Oppo/Realme/Huawei under **Settings → Security / Privacy / Apps → App Lock**) with a parent-only PIN (without the teenager's biometrics) to lock **Google Play Store**, **F-Droid**, and **Settings** (plus any vendor app store).
+     - On devices without built-in App Lock (e.g. Pixel), either manage **Apps from unknown sources = OFF** and block **F-Droid** between parent check-ins via **Google Family Link** *(note: pauses F-Droid auto-updates until temporarily allowed)*, or install a Play Store **App Lock** utility and PIN-lock **Google Play Store**, **F-Droid**, and **Settings** before locking Play Store itself.
+7. **Verify:** opening an `.apk` from Chrome/Files is blocked; opening Play Store, F-Droid, or Settings prompts for the parent PIN; opening this app launches normally without a PIN.
+
+### Licensing
+
+Upstream Termux notices remain in [LICENSE.md](LICENSE.md); `emthin` (GPL-3.0) attribution and native core source references are documented in [EMTHIN_NOTICE.md](EMTHIN_NOTICE.md) and [LICENSE.md](LICENSE.md).
 
 ## Termux App and Plugins
 

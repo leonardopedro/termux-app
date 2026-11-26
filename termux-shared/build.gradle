@@ -4,7 +4,7 @@ apply plugin: 'maven-publish'
 android {
     namespace = "com.termux.shared"
 
-    compileSdkVersion project.properties.compileSdkVersion.toInteger()
+    compileSdk = (findProperty('emthinCompileSdk') ?: project.properties.compileSdkVersion).toInteger()
     ndkVersion = System.getenv("JITPACK_NDK_VERSION") ?: project.properties.ndkVersion
 
     dependencies {
@@ -32,7 +32,6 @@ android {
     }
 
     defaultConfig {
-        compileSdkVersion project.properties.compileSdkVersion.toInteger()
         minSdkVersion project.properties.minSdkVersion.toInteger()
         targetSdkVersion project.properties.targetSdkVersion.toInteger()
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
@@ -58,9 +57,11 @@ android {
         targetCompatibility JavaVersion.VERSION_1_8
     }
 
-    externalNativeBuild {
-        ndkBuild {
-            path file('src/main/cpp/Android.mk')
+    if (System.getProperty("os.arch") == "amd64" && System.getenv("EMTHIN_PREBUILT_NATIVE") != "1") {
+        externalNativeBuild {
+            ndkBuild {
+                path file('src/main/cpp/Android.mk')
+            }
         }
     }
 

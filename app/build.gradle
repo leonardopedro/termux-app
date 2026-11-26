@@ -15,7 +15,7 @@ ext {
 android {
     namespace "com.termux"
 
-    compileSdkVersion project.properties.compileSdkVersion.toInteger()
+    compileSdk = (findProperty('emthinCompileSdk') ?: project.properties.compileSdkVersion).toInteger()
     ndkVersion = System.getenv("JITPACK_NDK_VERSION") ?: project.properties.ndkVersion
     def appVersionName = System.getenv("TERMUX_APP_VERSION_NAME") ?: ""
     def apkVersionTag = System.getenv("TERMUX_APK_VERSION_TAG") ?: ""
@@ -38,6 +38,7 @@ android {
 
         implementation project(":terminal-view")
         implementation project(":termux-shared")
+        implementation project(":emthin-core")
     }
 
     defaultConfig {
@@ -106,9 +107,11 @@ android {
         targetCompatibility JavaVersion.VERSION_1_8
     }
 
-    externalNativeBuild {
-        ndkBuild {
-            path "src/main/cpp/Android.mk"
+    if (System.getProperty("os.arch") == "amd64" && System.getenv("EMTHIN_PREBUILT_NATIVE") != "1") {
+        externalNativeBuild {
+            ndkBuild {
+                path "src/main/cpp/Android.mk"
+            }
         }
     }
 
@@ -237,7 +240,9 @@ task downloadBootstraps() {
 }
 
 afterEvaluate {
-    android.applicationVariants.all { variant ->
-        variant.javaCompileProvider.get().dependsOn(downloadBootstraps)
+    if (System.getenv("EMTHIN_PREBUILT_NATIVE") != "1") {
+        android.applicationVariants.all { variant ->
+            variant.javaCompileProvider.get().dependsOn(downloadBootstraps)
+        }
     }
 }

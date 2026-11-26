@@ -4,7 +4,7 @@ apply plugin: 'maven-publish'
 android {
     namespace "com.termux.emulator"
 
-    compileSdkVersion project.properties.compileSdkVersion.toInteger()
+    compileSdk = (findProperty('emthinCompileSdk') ?: project.properties.compileSdkVersion).toInteger()
     ndkVersion = System.getenv("JITPACK_NDK_VERSION") ?: project.properties.ndkVersion
 
     defaultConfig {
@@ -29,9 +29,11 @@ android {
         }
     }
 
-    externalNativeBuild {
-        ndkBuild {
-            path "src/main/jni/Android.mk"
+    if (System.getProperty("os.arch") == "amd64" && System.getenv("EMTHIN_PREBUILT_NATIVE") != "1") {
+        externalNativeBuild {
+            ndkBuild {
+                path "src/main/jni/Android.mk"
+            }
         }
     }
 
