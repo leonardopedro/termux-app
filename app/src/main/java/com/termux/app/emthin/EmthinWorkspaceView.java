@@ -55,7 +55,8 @@ public final class EmthinWorkspaceView extends LinearLayout {
     private static final float TEXT_SIZE_PT = 10.0f;
 
     private static final String INITIAL_DOCUMENT =
-            "= emthin · Termux\n";
+            "= emthin · Termux\n"
+                    + "Inline Wayland window #inlineA#inlineB \\app(#inlineA, #inlineB, 96, 28, \"inline-wl-demo\", inline: true, align: \"middle\") flows inside text.\n";
 
     public interface Actions {
         void onRequestNewTerminal();
@@ -278,7 +279,9 @@ public final class EmthinWorkspaceView extends LinearLayout {
             }
             DocBridge.appendAppFigure(docHandle, caption, wPt, hPt, appId);
             appendedAppIds.add(appId);
-            pendingScrollToAppId = appId;
+            if (!appId.startsWith(TERMUX_PREFIX)) {
+                pendingScrollToAppId = appId;
+            }
             if (editorPanel.getVisibility() == VISIBLE) syncDocEditorFromModel();
             return true;
         } catch (JSONException e) {
@@ -444,6 +447,11 @@ public final class EmthinWorkspaceView extends LinearLayout {
         if (pendingScrollToAppId == null || pendingScrollToAppId.isEmpty() || pageScroll == null) return;
         String target = pendingScrollToAppId;
         pendingScrollToAppId = "";
+        scrollToAppId(target);
+    }
+
+    private void scrollToAppId(String target) {
+        if (target == null || target.isEmpty() || pageScroll == null) return;
         for (PageHost host : pages) {
             if (host.figures == null) continue;
             float scale = host.imageWidth() / (float) Math.max(1.0, host.widthPt);
@@ -546,11 +554,21 @@ public final class EmthinWorkspaceView extends LinearLayout {
                 final String demoBin = EmthinWaylandBridge.getDemoBinaryPath(getContext());
                 final String cmd = "export XDG_RUNTIME_DIR=" + EmthinWaylandBridge.getRuntimeDir(getContext()).getAbsolutePath()
                         + " WAYLAND_DISPLAY=" + EmthinWaylandBridge.WAYLAND_DISPLAY_NAME + "\n"
+                        + "\"" + demoBin + "\" --app-id inline-wl-demo --title 'Inline Wayland' --seconds 15 &\n"
                         + "\"" + demoBin + "\" --app-id shell-wl-demo --title 'Shell Wayland' --seconds 15 &\n";
                 main.post(() -> {
                     byte[] bytes = cmd.getBytes(java.nio.charset.StandardCharsets.UTF_8);
                     session.write(bytes, 0, bytes.length);
                 });
+
+                WaylandSurfaceView inlineWlView = waitForWaylandFigure("inline-wl-demo", 12_000);
+                if (inlineWlView == null) {
+                    Logger.logError(LOG_TAG, "smoke FAIL: timed out waiting for inline-wl-demo Wayland frame");
+                    return;
+                }
+                GpuContract.RenderResult inlineWlRes = inlineWlView.getLastResult();
+                Logger.logInfo(LOG_TAG, "smoke inlineWaylandFrame key=" + inlineWlView.getFigureKey()
+                        + " backend=" + inlineWlRes.backend + " ok=" + inlineWlRes.rendered);
 
                 WaylandSurfaceView wlView = waitForWaylandFigure("shell-wl-demo", 12_000);
                 if (wlView == null) {
@@ -591,7 +609,13 @@ public final class EmthinWorkspaceView extends LinearLayout {
                     }
                 }
             }
-            main.post(this::requestAllFigureFrames);
+            main.post(() -> {
+                if (!sessionByHandle.isEmpty()) {
+                    scrollToAppId(TERMUX_PREFIX + sessionByHandle.keySet().iterator().next());
+                }
+                clipAllPages();
+                requestAllFigureFrames();
+            });
             Thread.sleep(100);
         }
         return null;
@@ -614,6 +638,7 @@ public final class EmthinWorkspaceView extends LinearLayout {
             }
             main.post(() -> {
                 pollPendingWaylandToplevels();
+                scrollToAppId(expectedAppId);
                 clipAllPages();
                 requestAllFigureFrames();
             });
@@ -741,8 +766,8 @@ public final class EmthinWorkspaceView extends LinearLayout {
                     });
                     waylandViews[i] = wv;
                     FrameLayout.LayoutParams wlp = new FrameLayout.LayoutParams(
-                            Math.max(64, Math.round(rect.width())),
-                            Math.max(48, Math.round(rect.height())));
+                            Math.max(12, Math.round(rect.width())),
+                            Math.max(12, Math.round(rect.height())));
                     wlp.leftMargin = Math.round(rect.left);
                     wlp.topMargin = Math.round(rect.top);
                     wlp.gravity = Gravity.TOP | Gravity.LEFT;

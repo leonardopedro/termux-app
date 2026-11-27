@@ -62,11 +62,7 @@ if [ "${SKIP_RUST_BUILD:-0}" != "1" ]; then
     (
         cd "$EMTHIN_ANDROID_DIR"
         export PATH="/nix/store/6gj4dzcv6gaxh5raqyrq7jmy605qaj3z-gcc-wrapper-16.2.0/bin:/nix/store/7d3a3frkcwb4ljxa901bdqcbdg4z83mi-zig-0.16.0/bin:/usr/bin:$PATH"
-        export CC_aarch64_linux_android="$TOOLCHAIN/clang"
-        export AR_aarch64_linux_android="$TOOLCHAIN/llvm-ar"
-        export CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER="$TOOLCHAIN/clang"
-        export RUSTFLAGS="-L$EMTHIN_ANDROID_DIR/.toolchain/sysroot/lib"
-        cargo build --release --locked --offline --target aarch64-linux-android
+        ANDROID_ABI=arm64-v8a bash ./build-apk.sh
     )
 fi
 
